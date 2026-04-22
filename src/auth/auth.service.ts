@@ -12,6 +12,8 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+import { MailService } from '../mail/mail.service';
 
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -32,12 +34,14 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly BCRYPT_SALT_ROUNDS = 12;
   private readonly REFRESH_SALT_ROUNDS = 10;
+  usersService: any;
 
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+     private readonly mailService: MailService, 
   ) {}
 
   // ─── Register ────────────────────────────────────────────────────────────────
@@ -316,4 +320,107 @@ export class AuthService {
     if (!match) return 900; // default 15m
     return parseInt(match[1], 10) * (units[match[2]] ?? 1);
   }
+
+
+
+async findOrCreateGoogleUser(profile: {
+  email: string;
+  name: string;
+  avatar: string;
+  googleId: string;
+}) {
+  let user = await this.userRepo.findOne({
+    where: { email: profile.email.toLowerCase().trim() },
+  });
+
+  if (!user) {
+    const hashedPassword = await bcrypt.hash(crypto.randomUUID(), this.BCRYPT_SALT_ROUNDS);
+
+    user = this.userRepo.create({
+      email:    profile.email.toLowerCase().trim(),
+      name:     profile.name,
+      password: hashedPassword,
+      role:     Role.USER,
+    });
+
+    await this.userRepo.save(user);
+    this.logger.log(`New Google user created: ${user.email}`);
+  }
+
+  const tokens = await this.generateTokens(user.id, user.email, user.role);
+  await this.storeHashedRefreshToken(user.id, tokens.refreshToken);
+
+  return { user, ...tokens };
+}
+
+
+
+
+// ─── Forgot Password ──────────────────────────────────────────────────────────
+async forgotPassword(email: string): Promise<{ message: string }> {
+  try {
+    const user = await this.userRepo.findOne({
+      where: { email: email.toLowerCase().trim() },
+    });
+
+    // Always return success — don't reveal if email exists
+    if (!user) {
+      this.logger.warn(`Password reset requested for unknown email: ${email}`);
+      return { message: 'If that email exists, a reset link has been sent.' };
+    }
+
+    // Generate secure token
+    const resetToken   = crypto.randomBytes(32).toString('hex');
+    const hashedToken  = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const expiresAt    = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.userRepo.update(user.id, {
+      passwordResetToken:     hashedToken,
+      passwordResetExpiresAt: expiresAt,
+    });
+
+    await this.mailService.sendPasswordResetEmail(user.email, resetToken);
+
+    this.logger.log(`Password reset email sent to: ${user.email}`);
+    return { message: 'If that email exists, a reset link has been sent.' };
+  } catch (error) {
+    this.logger.error(`Forgot password failed for: ${email}`, error);
+    throw new InternalServerErrorException('Failed to send reset email. Please try again.');
+  }
+}
+
+// ─── Reset Password ───────────────────────────────────────────────────────────
+async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  try {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await this.userRepo.findOne({
+      where: { passwordResetToken: hashedToken },
+    });
+
+    if (!user || !user.passwordResetExpiresAt) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    if (user.passwordResetExpiresAt < new Date()) {
+      throw new UnauthorizedException('Reset token has expired. Please request a new one.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, this.BCRYPT_SALT_ROUNDS);
+
+    await this.userRepo.update(user.id, {
+      password:               hashedPassword,
+      passwordResetToken:     null,
+      passwordResetExpiresAt: null,
+      hashedRefreshToken:     null, // force logout everywhere
+    });
+
+    this.logger.log(`Password reset successful for: ${user.email}`);
+    return { message: 'Password reset successful. You can now log in.' };
+  } catch (error) {
+    if (error instanceof UnauthorizedException) throw error;
+    this.logger.error('Reset password failed', error);
+    throw new InternalServerErrorException('Password reset failed. Please try again.');
+  }
+}
 }

@@ -10,6 +10,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { User } from '../users/entities/user.entity';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -26,9 +28,11 @@ import { User } from '../users/entities/user.entity';
         },
       }),
     }),
+
+      MailModule, 
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtRefreshStrategy, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtRefreshStrategy, JwtAuthGuard , GoogleStrategy],
   exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}

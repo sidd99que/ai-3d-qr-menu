@@ -35,4 +35,10 @@ export class User {
 
   @Column({ default: true })  // ← also fix this — it was missing @Column
   isActive: boolean;
+
+  @Column({ nullable: true, type: 'text' })
+passwordResetToken: string | null;
+
+@Column({ nullable: true, type: 'timestamp' })
+passwordResetExpiresAt: Date | null;
 }
