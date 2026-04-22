@@ -6,11 +6,20 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,        // ✅ ADD THIS
+    "esModuleInterop": true,
     "target": "ES2017",
     "sourceMap": true,
+
+    "rootDir": "./src",              // ✅ FIXED
     "outDir": "./dist",
-    "baseUrl": "./",
+
+    "baseUrl": "./",                 // ⚠️ still needed
+    "paths": {
+      "@/*": ["src/*"]               // ✅ alias support
+    },
+
+
+
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,

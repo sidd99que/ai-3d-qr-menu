@@ -1,10 +1,12 @@
 import { Controller, Get, Query, Res, HttpException, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import axios from 'axios';
+import { Public } from '../common/decorators/public.decorator';
 
 @Controller()
 export class ProxyController {
 
+   @Public() 
   @Get('proxy-model')
   async proxyModel(
     @Query('url') url: string,
