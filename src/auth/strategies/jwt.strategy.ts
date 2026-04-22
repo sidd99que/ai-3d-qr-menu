@@ -6,6 +6,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -17,13 +19,29 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET'),
+      secretOrKey: config.getOrThrow<string>('JWT_SECRET'), // ✅ getOrThrow — crash on missing secret
     });
   }
 
-  async validate(payload: { sub: string; email: string; role: string }) {
-    const user = await this.userRepo.findOne({ where: { id: payload.sub } });
-    if (!user) throw new UnauthorizedException('User no longer exists');
-    return { sub: payload.sub, email: payload.email, role: payload.role };
+  async validate(payload: JwtPayload): Promise<JwtPayload> {
+    const user = await this.userRepo.findOne({
+      where: { id: payload.sub },
+      select: { id: true, isActive: true }, // ✅ only fetch what we need
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User no longer exists');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Your account has been deactivated');
+    }
+
+    // ✅ This is what gets attached to request.user
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role as Role,
+    };
   }
 }

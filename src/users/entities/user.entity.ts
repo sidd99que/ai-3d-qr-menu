@@ -24,10 +24,21 @@ export class User {
   @Column({ nullable: true, type: 'text' })
   hashedRefreshToken: string | null;
 
+  @Column({ nullable: true, type: 'timestamp' })  // ← add this
+  lastLoginAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-  isActive: any;
+
+  @Column({ default: true })  // ← also fix this — it was missing @Column
+  isActive: boolean;
+
+  @Column({ nullable: true, type: 'text' })
+passwordResetToken: string | null;
+
+@Column({ nullable: true, type: 'timestamp' })
+passwordResetExpiresAt: Date | null;
 }

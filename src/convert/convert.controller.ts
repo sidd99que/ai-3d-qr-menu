@@ -11,7 +11,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ConvertService } from './convert.service';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
+ @Public() 
 @Controller('convert')
 export class ConvertController {
   constructor(private readonly convertService: ConvertService) {}
@@ -57,6 +60,7 @@ export class ConvertController {
 
   // GET /api/convert/status/:taskId
   // Frontend polls this until status = success
+   @Public() 
   @Get('status/:taskId')
   async getStatus(@Param('taskId') taskId: string) {
     const result = await this.convertService.checkStatus(taskId);
