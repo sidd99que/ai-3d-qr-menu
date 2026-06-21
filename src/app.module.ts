@@ -7,6 +7,7 @@ import { ConvertModule } from './convert/convert.module';
 import { AuthModule } from './auth/auth.module';           // ← add this
 import { ProxyController } from './proxy/proxy.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -33,7 +34,8 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     }),
 
     ConvertModule,
-    AuthModule,   // ← add this
+    AuthModule,   
+    UsersModule,
   ],
   controllers: [ProxyController],
   providers: [
